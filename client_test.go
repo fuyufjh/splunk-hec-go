@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	testSplunkURL   = "https://localhost:8088"
+	testSplunkURL   = "http://localhost:8088"
 	testSplunkToken = "00000000-0000-0000-0000-000000000000"
 )
 

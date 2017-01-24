@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	testSplunkURLs = []string{"https://127.0.0.1:8088", "https://localhost:8088"}
+	testSplunkURLs = []string{"http://127.0.0.1:8088", "http://localhost:8088"}
 )
 
 func TestCluster_WriteEvent(t *testing.T) {

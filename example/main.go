@@ -11,7 +11,7 @@ import (
 
 func main() {
 	client := hec.NewCluster(
-		[]string{"https://127.0.0.1:8088", "https://localhost:8088"},
+		[]string{"http://127.0.0.1:8088", "http://localhost:8088"},
 		"00000000-0000-0000-0000-000000000000",
 	)
 	client.SetHTTPClient(&http.Client{Transport: &http.Transport{
