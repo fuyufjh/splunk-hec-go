@@ -1,0 +1,4 @@
+Splunk HEC Golang Library
+=========================
+
+
