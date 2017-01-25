@@ -14,9 +14,12 @@ const (
 	testSplunkToken = "00000000-0000-0000-0000-000000000000"
 )
 
-var insecureClient *http.Client = &http.Client{Transport: &http.Transport{
-	TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-}}
+var testHttpClient *http.Client = &http.Client{
+	Transport: &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	},
+	Timeout: 100 * time.Millisecond,
+}
 
 func TestHEC_WriteEvent(t *testing.T) {
 	event := &Event{
@@ -29,7 +32,7 @@ func TestHEC_WriteEvent(t *testing.T) {
 	}
 
 	c := NewClient(testSplunkURL, testSplunkToken)
-	c.SetHTTPClient(insecureClient)
+	c.SetHTTPClient(testHttpClient)
 	err := c.WriteEvent(event)
 	assert.NoError(t, err)
 }
@@ -48,7 +51,7 @@ func TestHEC_WriteObjectEvent(t *testing.T) {
 	}
 
 	c := NewClient(testSplunkURL, testSplunkToken)
-	c.SetHTTPClient(insecureClient)
+	c.SetHTTPClient(testHttpClient)
 	err := c.WriteEvent(event)
 	assert.NoError(t, err)
 }
@@ -60,7 +63,7 @@ func TestHEC_WriteEventBatch(t *testing.T) {
 	}
 
 	c := NewClient(testSplunkURL, testSplunkToken)
-	c.SetHTTPClient(insecureClient)
+	c.SetHTTPClient(testHttpClient)
 	err := c.WriteBatch(events)
 	assert.NoError(t, err)
 }
@@ -72,7 +75,7 @@ func TestHEC_WriteEventRaw(t *testing.T) {
 		Source: String("test-hec-raw"),
 	}
 	c := NewClient(testSplunkURL, testSplunkToken)
-	c.SetHTTPClient(insecureClient)
+	c.SetHTTPClient(testHttpClient)
 	err := c.WriteRaw([]byte(events), &metadata)
 	assert.NoError(t, err)
 }
