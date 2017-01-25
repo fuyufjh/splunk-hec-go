@@ -10,6 +10,8 @@ import (
 	"github.com/satori/go.uuid"
 )
 
+const retryWaitTime = 1 * time.Second
+
 type Client struct {
 	HEC
 
@@ -27,6 +29,9 @@ type Client struct {
 
 	// Channel (required for Raw mode)
 	channel string
+
+	// Max retrying times (optional, default: 2)
+	retries int
 }
 
 func NewClient(serverURL string, token string) HEC {
@@ -36,6 +41,7 @@ func NewClient(serverURL string, token string) HEC {
 		token:      token,
 		keepAlive:  true,
 		channel:    uuid.NewV4().String(),
+		retries:    2,
 	}
 }
 
@@ -49,6 +55,10 @@ func (hec *Client) SetKeepAlive(enable bool) {
 
 func (hec *Client) SetChannel(channel string) {
 	hec.channel = channel
+}
+
+func (hec *Client) SetMaxRetry(retries int) {
+	hec.retries = retries
 }
 
 func (hec *Client) WriteEvent(event *Event) error {
@@ -80,12 +90,6 @@ func (hec *Client) WriteRaw(events []byte, metadata *EventMetadata) error {
 	return hec.write(endpoint, events)
 }
 
-// Response is response message from HEC. For example, `{"text":"Success","code":0}`.
-type Response struct {
-	Text string `json:"text"`
-	Code string `json:"code"`
-}
-
 func responseFrom(body []byte) *Response {
 	var res Response
 	json.Unmarshal(body, &res)
@@ -102,6 +106,8 @@ func (res *Response) String() string {
 }
 
 func (hec *Client) write(endpoint string, data []byte) error {
+	retries := 0
+RETRY:
 	req, err := http.NewRequest(http.MethodPost, hec.serverURL+endpoint, bytes.NewReader(data))
 	if err != nil {
 		return err
@@ -115,11 +121,20 @@ func (hec *Client) write(endpoint string, data []byte) error {
 		return err
 	}
 
-	body, _ := ioutil.ReadAll(res.Body)
+	body, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
+	if err != nil {
+		return err
+	}
 
-	if res.StatusCode != 200 {
-		return responseFrom(body)
+	if res.StatusCode != http.StatusOK {
+		response := responseFrom(body)
+		if retriable(response.Code) && retries < hec.retries {
+			retries++
+			time.Sleep(retryWaitTime)
+			goto RETRY
+		}
+		return response
 	}
 	return nil
 }

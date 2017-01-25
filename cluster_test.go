@@ -21,7 +21,7 @@ func TestCluster_WriteEvent(t *testing.T) {
 	}
 
 	c := NewCluster(testSplunkURLs, testSplunkToken)
-	c.SetHTTPClient(insecureClient)
+	c.SetHTTPClient(testHttpClient)
 	err := c.WriteEvent(event)
 	assert.NoError(t, err)
 }
@@ -39,7 +39,7 @@ func TestCluster_WriteEventBatch(t *testing.T) {
 	}
 
 	c := NewCluster(testSplunkURLs, testSplunkToken)
-	c.SetHTTPClient(insecureClient)
+	c.SetHTTPClient(testHttpClient)
 	for _, batch := range eventBatches {
 		err := c.WriteBatch(batch)
 		assert.NoError(t, err)
@@ -57,9 +57,20 @@ func TestCluster_WriteEventRaw(t *testing.T) {
 		Source: String("test-hec-raw"),
 	}
 	c := NewCluster(testSplunkURLs, testSplunkToken)
-	c.SetHTTPClient(insecureClient)
+	c.SetHTTPClient(testHttpClient)
 	for _, block := range eventBlocks {
 		err := c.WriteRaw([]byte(block), &metadata)
+		assert.NoError(t, err)
+	}
+}
+
+func TestCluster_Retrying(t *testing.T) {
+	event := &Event{Event: "test retrying"}
+	partlyBrokenUrls := []string{"http://127.0.0.1:8088", "http://example.com:8088", "http://example.com:88"}
+	c := NewCluster(partlyBrokenUrls, testSplunkToken)
+	c.SetHTTPClient(testHttpClient)
+	for i := 0; i < 5; i++ {
+		err := c.WriteEvent(event)
 		assert.NoError(t, err)
 	}
 }
