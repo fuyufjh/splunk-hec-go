@@ -3,15 +3,31 @@ Splunk HEC Golang Library
 
 [![Build Status](https://travis-ci.org/fuyufjh/splunk-hec-go.svg?branch=master)](https://travis-ci.org/fuyufjh/splunk-hec-go)
 
+Golang library for Splunk HTTP Event Collector (HEC).
+
 ## Build
 
-You need install [glide](https://github.com/Masterminds/glide) before build. To install all dependencies,
+You need install [glide](https://github.com/Masterminds/glide) before build.
+
+Install all dependencies
 
 ```bash
 glide install
+```
 
+Build the example
+
+```bash
 go build -o build/example ./example/main.go
 ```
+
+## Features
+
+- [x] Support HEC JSON mode and Raw mode
+- [x] Send batch of events
+- [x] Customize retrying times
+- [ ] Streaming data via HEC Raw
+- [ ] Indexer acknowledgement
 
 ## Example
 
@@ -27,7 +43,7 @@ client.SetHTTPClient(&http.Client{Transport: &http.Transport{
 event1 := hec.NewEvent("event one")
 event1.SetTime(time.Now())
 event2 := hec.NewEvent("event two")
-event2.SetTime(time.Now().Add(time.Minute))
+event2.SetTime(time.Now().Add(-time.Minute))
 
 err := client.WriteBatch([]*hec.Event{event1, event2})
 if err != nil {
