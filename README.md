@@ -26,6 +26,7 @@ go build -o build/example ./example/main.go
 - [x] Support HEC JSON mode and Raw mode
 - [x] Send batch of events
 - [x] Customize retrying times
+- [x] Cut big batch into chunk less than MaxContentLength
 - [ ] Streaming data via HEC Raw
 - [ ] Indexer acknowledgement
 
