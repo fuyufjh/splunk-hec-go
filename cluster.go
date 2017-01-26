@@ -1,6 +1,7 @@
 package hec
 
 import (
+	"io"
 	"math/rand"
 	"net/http"
 	"sync"
@@ -30,6 +31,7 @@ func NewCluster(serverURLs []string, token string) HEC {
 			keepAlive:  true,
 			channel:    channel,
 			retries:    0, // try only once for each client
+			maxLength:  defaultMaxContentLength,
 		}
 	}
 	return &Cluster{
@@ -66,6 +68,14 @@ func (c *Cluster) SetMaxRetry(retries int) {
 	c.maxRetries = retries
 }
 
+func (c *Cluster) SetMaxContentLength(size int) {
+	c.mtx.Lock()
+	for _, client := range c.clients {
+		client.SetMaxContentLength(size)
+	}
+	c.mtx.Unlock()
+}
+
 func (c *Cluster) WriteEvent(event *Event) error {
 	return c.retry(func(client *Client) error {
 		return client.WriteEvent(event)
@@ -78,9 +88,9 @@ func (c *Cluster) WriteBatch(events []*Event) error {
 	})
 }
 
-func (c *Cluster) WriteRaw(events []byte, metadata *EventMetadata) error {
+func (c *Cluster) WriteRaw(reader io.Reader, metadata *EventMetadata) error {
 	return c.retry(func(client *Client) error {
-		return client.WriteRaw(events, metadata)
+		return client.WriteRaw(reader, metadata)
 	})
 }
 
