@@ -1,6 +1,7 @@
 package hec
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -59,7 +60,7 @@ func TestCluster_WriteEventRaw(t *testing.T) {
 	c := NewCluster(testSplunkURLs, testSplunkToken)
 	c.SetHTTPClient(testHttpClient)
 	for _, block := range eventBlocks {
-		err := c.WriteRaw([]byte(block), &metadata)
+		err := c.WriteRaw(strings.NewReader(block), &metadata)
 		assert.NoError(t, err)
 	}
 }

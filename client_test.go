@@ -3,6 +3,7 @@ package hec
 import (
 	"crypto/tls"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -56,6 +57,24 @@ func TestHEC_WriteObjectEvent(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestHEC_WriteLongEvent(t *testing.T) {
+	event := &Event{
+		Index:      String("main"),
+		Source:     String("test-hec-raw"),
+		SourceType: String("manual"),
+		Host:       String("localhost"),
+		Time:       String("1485237827.123"),
+		Event:      "hello, world",
+	}
+
+	c := NewClient(testSplunkURL, testSplunkToken)
+	c.SetHTTPClient(testHttpClient)
+	c.SetMaxContentLength(20) // less than full event
+	err := c.WriteEvent(event)
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), "too long")
+}
+
 func TestHEC_WriteEventBatch(t *testing.T) {
 	events := []*Event{
 		{Event: "event one"},
@@ -68,6 +87,19 @@ func TestHEC_WriteEventBatch(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestHEC_WriteLongEventBatch(t *testing.T) {
+	events := []*Event{
+		{Event: "event one"},
+		{Event: "event two"},
+	}
+
+	c := NewClient(testSplunkURL, testSplunkToken)
+	c.SetHTTPClient(testHttpClient)
+	c.SetMaxContentLength(25)
+	err := c.WriteBatch(events)
+	assert.NoError(t, err)
+}
+
 func TestHEC_WriteEventRaw(t *testing.T) {
 	events := `2017-01-24T06:07:10.488Z Raw event one
 2017-01-24T06:07:12.434Z Raw event two`
@@ -76,6 +108,19 @@ func TestHEC_WriteEventRaw(t *testing.T) {
 	}
 	c := NewClient(testSplunkURL, testSplunkToken)
 	c.SetHTTPClient(testHttpClient)
-	err := c.WriteRaw([]byte(events), &metadata)
+	err := c.WriteRaw(strings.NewReader(events), &metadata)
+	assert.NoError(t, err)
+}
+
+func TestHEC_WriteLongEventRaw(t *testing.T) {
+	events := `2017-01-24T06:07:10.488Z Raw event one
+2017-01-24T06:07:12.434Z Raw event two`
+	metadata := EventMetadata{
+		Source: String("test-hec-raw"),
+	}
+	c := NewClient(testSplunkURL, testSplunkToken)
+	c.SetMaxContentLength(40)
+	c.SetHTTPClient(testHttpClient)
+	err := c.WriteRaw(strings.NewReader(events), &metadata)
 	assert.NoError(t, err)
 }
