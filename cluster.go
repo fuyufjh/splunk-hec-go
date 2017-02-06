@@ -101,9 +101,14 @@ func (c *Cluster) retry(writeFunc func(*Client) error) error {
 	var err error
 	for t := 0; t < len(c.clients) && t != c.maxRetries; t++ {
 		client := pick(c.clients, exclude)
-		// If failed to write into this client, exclude it and try others
 		if err = writeFunc(client); err != nil {
-			exclude = append(exclude, client)
+			if err == ErrEventTooLong {
+				return err
+			} else if res, ok := err.(*Response); !ok || retriable(res.Code) {
+				// If failed to write into this client, exclude it and try others
+				exclude = append(exclude, client)
+				continue
+			}
 		} else {
 			return nil
 		}
