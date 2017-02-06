@@ -1,7 +1,6 @@
 package hec
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"io"
@@ -84,7 +83,7 @@ func (hec *Client) WriteEvent(event *Event) error {
 	data, _ := json.Marshal(event)
 
 	if len(data) > hec.maxLength {
-		return &ErrEventTooLong{}
+		return ErrEventTooLong
 	}
 	return hec.write(endpoint, data)
 }
@@ -124,7 +123,7 @@ func (hec *Client) WriteBatch(events []*Event) error {
 		}
 	}
 	if len(tooLongs) > 0 {
-		return &ErrEventTooLong{tooLongs}
+		return ErrEventTooLong
 	}
 	return nil
 }
@@ -140,33 +139,46 @@ type EventMetadata struct {
 func (hec *Client) WriteRaw(reader io.ReadSeeker, metadata *EventMetadata) error {
 	endpoint := rawHecEndpoint(hec.channel, metadata)
 
-	scanner := bufio.NewScanner(reader)
-	var buf bytes.Buffer
-	var tooLongs []int
-
-	for lineNo := 1; scanner.Scan(); lineNo++ {
-		if len(scanner.Bytes()) > hec.maxLength {
-			tooLongs = append(tooLongs, lineNo)
-			continue
+	var buf []byte = make([]byte, hec.maxLength + 1)
+	var writeAt int
+	for {
+		n, err := reader.Read(buf[writeAt:hec.maxLength])
+		if n == 0 && err == io.EOF {
+			break
 		}
-		// Send out bytes in buffer immediately if the limit exceeded after adding this line
-		if buf.Len()+len(scanner.Bytes())+1 > hec.maxLength {
-			if err := hec.write(endpoint, buf.Bytes()); err != nil {
+
+		// If last line does not end with LF, add one for it
+		if err == io.EOF && buf[writeAt + n - 1] != '\n' {
+			n++
+			buf[writeAt + n - 1] = '\n'
+		}
+
+		data := buf[0:writeAt+n]
+
+		// Cut after the last LF character
+		cut := bytes.LastIndexByte(data, '\n') + 1
+		if cut == 0 {
+			// This line is too long, but just let it break here
+			cut = len(data)
+		}
+		if err := hec.write(endpoint, buf[:cut]); err != nil {
+			// Ignore NoData error (e.g. "\n\n" will cause NoData error)
+			if res, ok := err.(*Response); !ok || res.Code != StatusNoData {
 				return err
 			}
-			buf.Reset()
 		}
-		buf.Write(scanner.Bytes())
-		buf.WriteByte('\n')
+
+		writeAt = copy(buf, data[cut:])
+
+		if err != nil && err != io.EOF {
+			if res, ok := err.(*Response); !ok || res.Code != StatusNoData {
+				return err
+			}
+		}
 	}
 
-	if buf.Len() > 0 {
-		if err := hec.write(endpoint, buf.Bytes()); err != nil {
-			return err
-		}
-	}
-	if len(tooLongs) > 0 {
-		return &ErrEventTooLong{tooLongs}
+	if writeAt != 0 {
+		return hec.write(endpoint, buf[:writeAt])
 	}
 	return nil
 }

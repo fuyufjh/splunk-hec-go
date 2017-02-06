@@ -1,9 +1,7 @@
 package hec
 
 import (
-	"fmt"
-	"strconv"
-	"strings"
+	"errors"
 )
 
 // Response is response message from HEC. For example, `{"text":"Success","code":0}`.
@@ -35,23 +33,4 @@ func retriable(code int) bool {
 	return code == StatusServerBusy || code == StatusInternalServerError
 }
 
-type ErrEventTooLong struct {
-	indexes []int
-}
-
-func (e *ErrEventTooLong) Error() string {
-	if e.indexes == nil {
-		return "Event length is too long"
-	}
-	ns := make([]string, len(e.indexes))
-	for i, n := range e.indexes {
-		ns[i] = strconv.Itoa(n)
-	}
-	numbers := strings.Join(ns, ", ")
-	return fmt.Sprintf("Events (%s) length are too long", numbers)
-}
-
-// GetIndexes gives the indexes or line numbers of too-long events
-func (e *ErrEventTooLong) GetIndexes() []int {
-	return e.indexes
-}
+var ErrEventTooLong = errors.New("Event length is too long")
