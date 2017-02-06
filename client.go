@@ -137,7 +137,7 @@ type EventMetadata struct {
 	Time       *time.Time
 }
 
-func (hec *Client) WriteRaw(reader io.Reader, metadata *EventMetadata) error {
+func (hec *Client) WriteRaw(reader io.ReadSeeker, metadata *EventMetadata) error {
 	endpoint := rawHecEndpoint(hec.channel, metadata)
 
 	scanner := bufio.NewScanner(reader)

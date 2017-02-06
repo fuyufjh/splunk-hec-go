@@ -19,5 +19,5 @@ type HEC interface {
 	WriteBatch(events []*Event) error
 
 	// WriteRaw writes raw data stream via HEC raw mode
-	WriteRaw(reader io.Reader, metadata *EventMetadata) error
+	WriteRaw(reader io.ReadSeeker, metadata *EventMetadata) error
 }
