@@ -139,21 +139,36 @@ type EventMetadata struct {
 func (hec *Client) WriteRaw(reader io.ReadSeeker, metadata *EventMetadata) error {
 	endpoint := rawHecEndpoint(hec.channel, metadata)
 
-	var buf []byte = make([]byte, hec.maxLength + 1)
+	return breakStream(reader, hec.maxLength, func(chunk []byte) error {
+		if err := hec.write(endpoint, chunk); err != nil {
+			// Ignore NoData error (e.g. "\n\n" will cause NoData error)
+			if res, ok := err.(*Response); !ok || res.Code != StatusNoData {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// breakStream breaks text from reader into chunks, with every chunk less than max.
+// Unless a single line is longer than max, it always cut at end of lines ("\n")
+func breakStream(reader io.ReadSeeker, max int, callback func(chunk []byte) error) error {
+
+	var buf []byte = make([]byte, max+1)
 	var writeAt int
 	for {
-		n, err := reader.Read(buf[writeAt:hec.maxLength])
+		n, err := reader.Read(buf[writeAt:max])
 		if n == 0 && err == io.EOF {
 			break
 		}
 
 		// If last line does not end with LF, add one for it
-		if err == io.EOF && buf[writeAt + n - 1] != '\n' {
+		if err == io.EOF && buf[writeAt+n-1] != '\n' {
 			n++
-			buf[writeAt + n - 1] = '\n'
+			buf[writeAt+n-1] = '\n'
 		}
 
-		data := buf[0:writeAt+n]
+		data := buf[0 : writeAt+n]
 
 		// Cut after the last LF character
 		cut := bytes.LastIndexByte(data, '\n') + 1
@@ -161,25 +176,21 @@ func (hec *Client) WriteRaw(reader io.ReadSeeker, metadata *EventMetadata) error
 			// This line is too long, but just let it break here
 			cut = len(data)
 		}
-		if err := hec.write(endpoint, buf[:cut]); err != nil {
-			// Ignore NoData error (e.g. "\n\n" will cause NoData error)
-			if res, ok := err.(*Response); !ok || res.Code != StatusNoData {
-				return err
-			}
+		if err := callback(buf[:cut]); err != nil {
+			return err
 		}
 
 		writeAt = copy(buf, data[cut:])
 
 		if err != nil && err != io.EOF {
-			if res, ok := err.(*Response); !ok || res.Code != StatusNoData {
-				return err
-			}
+			return err
 		}
 	}
 
 	if writeAt != 0 {
-		return hec.write(endpoint, buf[:writeAt])
+		return callback(buf[:writeAt])
 	}
+
 	return nil
 }
 

@@ -124,3 +124,26 @@ func TestHEC_WriteLongEventRaw(t *testing.T) {
 	err := c.WriteRaw(strings.NewReader(events), &metadata)
 	assert.NoError(t, err)
 }
+
+func TestBreakStream(t *testing.T) {
+	text := "This is line A\nThis is line B" // length of every line is 14
+
+	getCountFunc := func(counter *int) func(chunk []byte) error {
+		// returned function adds count of all character except "\n"
+		return func(chunk []byte) error {
+			for _, b := range chunk {
+				if b != '\n' {
+					*counter++
+				}
+			}
+			return nil
+		}
+	}
+
+	for _, max := range []int{13, 14, 15, 28, 5, 30} {
+		var counter int = 0
+		err := breakStream(strings.NewReader(text), max, getCountFunc(&counter))
+		assert.NoError(t, err)
+		assert.Equal(t, 28, counter)
+	}
+}
