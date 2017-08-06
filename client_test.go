@@ -3,6 +3,7 @@ package hec
 import (
 	"crypto/tls"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -32,7 +33,10 @@ func TestHEC_WriteEvent(t *testing.T) {
 		Event:      "hello, world",
 	}
 
-	c := NewClient(testSplunkURL, testSplunkToken)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"text":"Success","code":0}`))
+	}))
+	c := NewClient(ts.URL, testSplunkToken)
 	c.SetHTTPClient(testHttpClient)
 	err := c.WriteEvent(event)
 	assert.NoError(t, err)
@@ -51,7 +55,10 @@ func TestHEC_WriteObjectEvent(t *testing.T) {
 		},
 	}
 
-	c := NewClient(testSplunkURL, testSplunkToken)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"text":"Success","code":0}`))
+	}))
+	c := NewClient(ts.URL, testSplunkToken)
 	c.SetHTTPClient(testHttpClient)
 	err := c.WriteEvent(event)
 	assert.NoError(t, err)
@@ -67,7 +74,11 @@ func TestHEC_WriteLongEvent(t *testing.T) {
 		Event:      "hello, world",
 	}
 
-	c := NewClient(testSplunkURL, testSplunkToken)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"text":"Success","code":0}`))
+	}))
+	c := NewClient(ts.URL, testSplunkToken)
+
 	c.SetHTTPClient(testHttpClient)
 	c.SetMaxContentLength(20) // less than full event
 	err := c.WriteEvent(event)
@@ -81,7 +92,11 @@ func TestHEC_WriteEventBatch(t *testing.T) {
 		{Event: "event two"},
 	}
 
-	c := NewClient(testSplunkURL, testSplunkToken)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"text":"Success","code":0}`))
+	}))
+	c := NewClient(ts.URL, testSplunkToken)
+
 	c.SetHTTPClient(testHttpClient)
 	err := c.WriteBatch(events)
 	assert.NoError(t, err)
@@ -93,7 +108,10 @@ func TestHEC_WriteLongEventBatch(t *testing.T) {
 		{Event: "event two"},
 	}
 
-	c := NewClient(testSplunkURL, testSplunkToken)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"text":"Success","code":0}`))
+	}))
+	c := NewClient(ts.URL, testSplunkToken)
 	c.SetHTTPClient(testHttpClient)
 	c.SetMaxContentLength(25)
 	err := c.WriteBatch(events)
@@ -106,7 +124,10 @@ func TestHEC_WriteEventRaw(t *testing.T) {
 	metadata := EventMetadata{
 		Source: String("test-hec-raw"),
 	}
-	c := NewClient(testSplunkURL, testSplunkToken)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"text":"Success","code":0}`))
+	}))
+	c := NewClient(ts.URL, testSplunkToken)
 	c.SetHTTPClient(testHttpClient)
 	err := c.WriteRaw(strings.NewReader(events), &metadata)
 	assert.NoError(t, err)
@@ -118,7 +139,10 @@ func TestHEC_WriteLongEventRaw(t *testing.T) {
 	metadata := EventMetadata{
 		Source: String("test-hec-raw"),
 	}
-	c := NewClient(testSplunkURL, testSplunkToken)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"text":"Success","code":0}`))
+	}))
+	c := NewClient(ts.URL, testSplunkToken)
 	c.SetMaxContentLength(40)
 	c.SetHTTPClient(testHttpClient)
 	err := c.WriteRaw(strings.NewReader(events), &metadata)
