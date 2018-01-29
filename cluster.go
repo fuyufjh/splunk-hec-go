@@ -21,7 +21,11 @@ type Cluster struct {
 }
 
 func NewCluster(serverURLs []string, token string) HEC {
-	channel := uuid.NewV4().String()
+	id, err := uuid.NewV4()
+	if err != nil {
+		panic(err)
+	}
+	channel := id.String()
 	clients := make([]*Client, len(serverURLs))
 	for i, serverURL := range serverURLs {
 		clients[i] = &Client{
