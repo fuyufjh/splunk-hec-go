@@ -2,6 +2,7 @@ package hec
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -78,7 +79,7 @@ func (hec *Client) SetMaxContentLength(size int) {
 	hec.maxLength = size
 }
 
-func (hec *Client) WriteEvent(event *Event) error {
+func (hec *Client) WriteEventWithContext(ctx context.Context, event *Event) error {
 	if event.empty() {
 		return nil // skip empty events
 	}
@@ -89,10 +90,14 @@ func (hec *Client) WriteEvent(event *Event) error {
 	if len(data) > hec.maxLength {
 		return ErrEventTooLong
 	}
-	return hec.write(endpoint, data)
+	return hec.write(ctx, endpoint, data)
 }
 
-func (hec *Client) WriteBatch(events []*Event) error {
+func (hec *Client) WriteEvent(event *Event) error {
+	return hec.WriteEventWithContext(context.Background(), event)
+}
+
+func (hec *Client) WriteBatchWithContext(ctx context.Context, events []*Event) error {
 	if len(events) == 0 {
 		return nil
 	}
@@ -113,7 +118,7 @@ func (hec *Client) WriteBatch(events []*Event) error {
 		}
 		// Send out bytes in buffer immediately if the limit exceeded after adding this event
 		if buffer.Len()+len(data) > hec.maxLength {
-			if err := hec.write(endpoint, buffer.Bytes()); err != nil {
+			if err := hec.write(ctx, endpoint, buffer.Bytes()); err != nil {
 				return err
 			}
 			buffer.Reset()
@@ -122,7 +127,7 @@ func (hec *Client) WriteBatch(events []*Event) error {
 	}
 
 	if buffer.Len() > 0 {
-		if err := hec.write(endpoint, buffer.Bytes()); err != nil {
+		if err := hec.write(ctx, endpoint, buffer.Bytes()); err != nil {
 			return err
 		}
 	}
@@ -130,6 +135,10 @@ func (hec *Client) WriteBatch(events []*Event) error {
 		return ErrEventTooLong
 	}
 	return nil
+}
+
+func (hec *Client) WriteBatch(events []*Event) error {
+	return hec.WriteBatchWithContext(context.Background(), events)
 }
 
 type EventMetadata struct {
@@ -140,11 +149,11 @@ type EventMetadata struct {
 	Time       *time.Time
 }
 
-func (hec *Client) WriteRaw(reader io.ReadSeeker, metadata *EventMetadata) error {
+func (hec *Client) WriteRawWithContext(ctx context.Context, reader io.ReadSeeker, metadata *EventMetadata) error {
 	endpoint := rawHecEndpoint(hec.channel, metadata)
 
 	return breakStream(reader, hec.maxLength, func(chunk []byte) error {
-		if err := hec.write(endpoint, chunk); err != nil {
+		if err := hec.write(ctx, endpoint, chunk); err != nil {
 			// Ignore NoData error (e.g. "\n\n" will cause NoData error)
 			if res, ok := err.(*Response); !ok || res.Code != StatusNoData {
 				return err
@@ -152,6 +161,10 @@ func (hec *Client) WriteRaw(reader io.ReadSeeker, metadata *EventMetadata) error
 		}
 		return nil
 	})
+}
+
+func (hec *Client) WriteRaw(reader io.ReadSeeker, metadata *EventMetadata) error {
+	return hec.WriteRawWithContext(context.Background(), reader, metadata)
 }
 
 // breakStream breaks text from reader into chunks, with every chunk less than max.
@@ -213,13 +226,14 @@ func (res *Response) String() string {
 	return string(b)
 }
 
-func (hec *Client) write(endpoint string, data []byte) error {
+func (hec *Client) write(ctx context.Context, endpoint string, data []byte) error {
 	retries := 0
 RETRY:
 	req, err := http.NewRequest(http.MethodPost, hec.serverURL+endpoint, bytes.NewReader(data))
 	if err != nil {
 		return err
 	}
+	req = req.WithContext(ctx)
 	if hec.keepAlive {
 		req.Header.Set("Connection", "keep-alive")
 	}
