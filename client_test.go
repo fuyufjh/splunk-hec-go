@@ -42,6 +42,26 @@ func TestHEC_WriteEvent(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestHEC_WriteEventServerFailure(t *testing.T) {
+	event := &Event{
+		Index:      String("main"),
+		Source:     String("test-hec-raw"),
+		SourceType: String("manual"),
+		Host:       String("localhost"),
+		Time:       String("1485237827.123"),
+		Event:      "hello, world",
+	}
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(400)
+		w.Write([]byte(`{"text":"Data channel is missing","code":10}`))
+	}))
+	c := NewClient(ts.URL, testSplunkToken)
+	c.SetHTTPClient(testHttpClient)
+	err := c.WriteEvent(event)
+	assert.Error(t, err)
+}
+
 func TestHEC_WriteObjectEvent(t *testing.T) {
 	event := &Event{
 		Index:      String("main"),
