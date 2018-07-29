@@ -169,6 +169,23 @@ func TestHEC_WriteLongEventRaw(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestHEC_WriteRawFailure(t *testing.T) {
+	events := `2017-01-24T06:07:10.488Z Raw event one
+2017-01-24T06:07:12.434Z Raw event two`
+	metadata := EventMetadata{
+		Source: String("test-hec-raw"),
+	}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(400)
+		w.Write([]byte(`{"text":"Oh no","code":90}`))
+	}))
+	c := NewClient(ts.URL, testSplunkToken)
+	c.SetMaxContentLength(40)
+	c.SetHTTPClient(testHttpClient)
+	err := c.WriteRaw(strings.NewReader(events), &metadata)
+	assert.Error(t, err)
+}
+
 func TestBreakStream(t *testing.T) {
 	text := "This is line A\nThis is line B" // length of every line is 14
 
