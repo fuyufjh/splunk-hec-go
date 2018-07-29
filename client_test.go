@@ -3,7 +3,6 @@ package hec
 import (
 	"crypto/tls"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -59,7 +58,7 @@ func jsonEndpoint(t *testing.T) http.Handler {
 		}
 		if failed {
 			w.WriteHeader(400)
-			w.Write([]byte(fmt.Sprintf(`{"text": %q, "code": 90}`, fmt.Errorf("Failed to decode JSON: %v", err).Error())))
+			w.Write([]byte(`{"text": "Error processing event", "code": 90}`))
 		} else {
 			w.Write([]byte(`{"text":"Success","code":0}`))
 		}
