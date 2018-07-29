@@ -2,6 +2,8 @@ package hec
 
 import (
 	"crypto/tls"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -23,6 +25,47 @@ var testHttpClient *http.Client = &http.Client{
 	Timeout: 100 * time.Millisecond,
 }
 
+func jsonEndpoint(t *testing.T) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		failed := false
+		input := make(map[string]interface{})
+		j := json.NewDecoder(r.Body)
+		err := j.Decode(&input)
+		if err != nil {
+			t.Errorf("Decoding JSON: %v", err)
+			failed = true
+		}
+
+		requiredFields := []string{"event"}
+		allowedFields := map[string]struct{}{
+			"channel":    struct{}{},
+			"event":      struct{}{},
+			"fields":     struct{}{},
+			"host":       struct{}{},
+			"index":      struct{}{},
+			"source":     struct{}{},
+			"sourcetype": struct{}{},
+			"time":       struct{}{},
+		}
+		for _, f := range requiredFields {
+			if _, ok := input[f]; !ok {
+				t.Errorf("Required field %q missing in %v", f, input)
+			}
+		}
+		for f := range input {
+			if _, ok := allowedFields[f]; !ok {
+				t.Errorf("Unexpected field %q in %v", f, input)
+			}
+		}
+		if failed {
+			w.WriteHeader(400)
+			w.Write([]byte(fmt.Sprintf(`{"text": %q, "code": 90}`, fmt.Errorf("Failed to decode JSON: %v", err).Error())))
+		} else {
+			w.Write([]byte(`{"text":"Success","code":0}`))
+		}
+	})
+}
+
 func TestHEC_WriteEvent(t *testing.T) {
 	event := &Event{
 		Index:      String("main"),
@@ -33,9 +76,7 @@ func TestHEC_WriteEvent(t *testing.T) {
 		Event:      "hello, world",
 	}
 
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`{"text":"Success","code":0}`))
-	}))
+	ts := httptest.NewServer(jsonEndpoint(t))
 	c := NewClient(ts.URL, testSplunkToken)
 	c.SetHTTPClient(testHttpClient)
 	err := c.WriteEvent(event)
@@ -75,9 +116,7 @@ func TestHEC_WriteObjectEvent(t *testing.T) {
 		},
 	}
 
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`{"text":"Success","code":0}`))
-	}))
+	ts := httptest.NewServer(jsonEndpoint(t))
 	c := NewClient(ts.URL, testSplunkToken)
 	c.SetHTTPClient(testHttpClient)
 	err := c.WriteEvent(event)
@@ -94,9 +133,7 @@ func TestHEC_WriteLongEvent(t *testing.T) {
 		Event:      "hello, world",
 	}
 
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`{"text":"Success","code":0}`))
-	}))
+	ts := httptest.NewServer(jsonEndpoint(t))
 	c := NewClient(ts.URL, testSplunkToken)
 
 	c.SetHTTPClient(testHttpClient)
@@ -112,9 +149,7 @@ func TestHEC_WriteEventBatch(t *testing.T) {
 		{Event: "event two"},
 	}
 
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`{"text":"Success","code":0}`))
-	}))
+	ts := httptest.NewServer(jsonEndpoint(t))
 	c := NewClient(ts.URL, testSplunkToken)
 
 	c.SetHTTPClient(testHttpClient)
@@ -128,9 +163,7 @@ func TestHEC_WriteLongEventBatch(t *testing.T) {
 		{Event: "event two"},
 	}
 
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`{"text":"Success","code":0}`))
-	}))
+	ts := httptest.NewServer(jsonEndpoint(t))
 	c := NewClient(ts.URL, testSplunkToken)
 	c.SetHTTPClient(testHttpClient)
 	c.SetMaxContentLength(25)
