@@ -1,11 +1,11 @@
-hash: 7dc4e8d6aa27ea3668054597c06cd98ccb53411b9f19c795e5385d49e504ee5e
-updated: 2018-01-04T11:49:23.156951+01:00
+hash: 58fb71ebba8d29536054a3813d631097b4c115ec0211022e5fd32a7833ad4b82
+updated: 2018-11-17T01:34:38.807844-03:00
 imports:
-- name: github.com/satori/go.uuid
-  version: 36e9d2ebbde5e3f13ab2e25625fd453271d6522e
+- name: github.com/google/uuid
+  version: d460ce9f8df2e77fb1ba55ca87fafed96c607494
 testImports:
 - name: github.com/davecgh/go-spew
-  version: ecdeabc65495df2dec95d7c4a4c3e021903035e5
+  version: d8f796af33cc11cb798c1aaeb27a4ebc5099927d
   subpackages:
   - spew
 - name: github.com/pmezard/go-difflib
@@ -13,6 +13,6 @@ testImports:
   subpackages:
   - difflib
 - name: github.com/stretchr/testify
-  version: b91bfb9ebec76498946beb6af7c0230c7cc7ba6c
+  version: f35b8ab0b5a2cef36673838d662e249dd9c94686
   subpackages:
   - assert
