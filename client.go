@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/satori/go.uuid"
+	"github.com/google/uuid"
 )
 
 const (
@@ -44,10 +44,8 @@ type Client struct {
 }
 
 func NewClient(serverURL string, token string) HEC {
-	id, err := uuid.NewV4()
-	if err != nil {
-		panic(err)
-	}
+	id := uuid.New()
+
 	return &Client{
 		httpClient: http.DefaultClient,
 		serverURL:  serverURL,
