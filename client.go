@@ -231,12 +231,12 @@ func (res *Response) String() string {
 	return string(b)
 }
 
-func (hec *Client) write(ctx context.Context, endpoint string, data []byte) error {
+func (hec *Client) makeRequest(ctx context.Context, endpoint string, data []byte) (*Response, error) {
 	retries := 0
 RETRY:
 	req, err := http.NewRequest(http.MethodPost, hec.serverURL+endpoint, bytes.NewReader(data))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	req = req.WithContext(ctx)
 	if hec.keepAlive {
@@ -245,13 +245,13 @@ RETRY:
 	req.Header.Set("Authorization", "Splunk "+hec.token)
 	res, err := hec.httpClient.Do(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	body, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	response := responseFrom(body)
@@ -262,6 +262,19 @@ RETRY:
 			time.Sleep(retryWaitTime)
 			goto RETRY
 		}
+	}
+
+	return response, nil
+}
+
+func (hec *Client) write(ctx context.Context, endpoint string, data []byte) error {
+	response, err := hec.makeRequest(ctx, endpoint, data)
+	if err != nil {
+		return err
+	}
+
+	// TODO: find out the correct code
+	if response.Text != "Success" {
 		return response
 	}
 
