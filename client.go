@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -41,6 +42,12 @@ type Client struct {
 
 	// Max content length (optional, default: 1000000)
 	maxLength int
+
+	// List of acknowledgement IDs provided by Splunk
+	ackIDs []string
+
+	// Mutex to allow threadsafe acknowledgement checking
+	ackMux sync.Mutex
 }
 
 func NewClient(serverURL string, token string) HEC {
@@ -247,8 +254,9 @@ RETRY:
 		return err
 	}
 
+	response := responseFrom(body)
+
 	if res.StatusCode != http.StatusOK {
-		response := responseFrom(body)
 		if retriable(response.Code) && retries < hec.retries {
 			retries++
 			time.Sleep(retryWaitTime)
@@ -256,6 +264,15 @@ RETRY:
 		}
 		return response
 	}
+
+	// Check for acknowledgement IDs and store them if provided
+	if response.AckID != "" {
+		hec.ackMux.Lock()
+		defer hec.ackMux.Unlock()
+
+		hec.ackIDs = append(hec.ackIDs, response.AckID)
+	}
+
 	return nil
 }
 

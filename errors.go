@@ -6,8 +6,9 @@ import (
 
 // Response is response message from HEC. For example, `{"text":"Success","code":0}`.
 type Response struct {
-	Text string `json:"text"`
-	Code int    `json:"code"`
+	Text  string `json:"text"`
+	Code  int    `json:"code"`
+	AckID string `json:"ackID,omitempty"`
 }
 
 // Response status codes
