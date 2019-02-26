@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -17,6 +19,8 @@ const (
 	retryWaitTime = 1 * time.Second
 
 	defaultMaxContentLength = 1000000
+
+	defaultAcknowledgementTimeout = 90 * time.Second
 )
 
 type Client struct {
@@ -44,7 +48,7 @@ type Client struct {
 	maxLength int
 
 	// List of acknowledgement IDs provided by Splunk
-	ackIDs []string
+	ackIDs []int
 
 	// Mutex to allow threadsafe acknowledgement checking
 	ackMux sync.Mutex
@@ -172,6 +176,82 @@ func (hec *Client) WriteRaw(reader io.ReadSeeker, metadata *EventMetadata) error
 	return hec.WriteRawWithContext(context.Background(), reader, metadata)
 }
 
+type acknowledgementRequest struct {
+	Acks []int `json:"acks"`
+}
+
+// WaitForAcknowledgementWithContext blocks until the Splunk indexer has
+// acknowledged that all previously submitted data has been successfully
+// indexed or if the provided context is cancelled. This requires the HEC token
+// configuration in Splunk to have indexer acknowledgement enabled.
+func (hec *Client) WaitForAcknowledgementWithContext(ctx context.Context) error {
+	// Make our own copy of the list of acknowledgement IDs and remove them
+	// from the client while we check them.
+	hec.ackMux.Lock()
+	ackIDs := hec.ackIDs
+	hec.ackIDs = nil
+	hec.ackMux.Unlock()
+
+	if len(ackIDs) == 0 {
+		return nil
+	}
+
+	endpoint := "/services/collector/ack?channel=" + hec.channel
+
+	for {
+		ackRequestData, _ := json.Marshal(acknowledgementRequest{Acks: ackIDs})
+
+		response, err := hec.makeRequest(ctx, endpoint, ackRequestData)
+		if err != nil {
+			// Put the remaining unacknowledged IDs back
+			hec.ackMux.Lock()
+			hec.ackIDs = append(hec.ackIDs, ackIDs...)
+			hec.ackMux.Unlock()
+			return err
+		}
+
+		for ackIDString, status := range response.Acks {
+			if status {
+				ackID, err := strconv.Atoi(ackIDString)
+				if err != nil {
+					return fmt.Errorf("could not convert ack ID to int: %v", err)
+				}
+
+				ackIDs = remove(ackIDs, ackID)
+			}
+		}
+
+		if len(ackIDs) == 0 {
+			break
+		}
+
+		// If the server did not indicate that all acknowledgements have been
+		// made, check again after a short delay.
+		select {
+		case <-time.After(retryWaitTime):
+			continue
+		case <-ctx.Done():
+			// Put the remaining unacknowledged IDs back
+			hec.ackMux.Lock()
+			hec.ackIDs = append(hec.ackIDs, ackIDs...)
+			hec.ackMux.Unlock()
+			return ctx.Err()
+		}
+	}
+
+	return nil
+}
+
+// WaitForAcknowledgement blocks until the Splunk indexer has acknowledged
+// that all previously submitted data has been successfully indexed or if the
+// default acknowledgement timeout is reached. This requires the HEC token
+// configuration in Splunk to have indexer acknowledgement enabled.
+func (hec *Client) WaitForAcknowledgement() error {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultAcknowledgementTimeout)
+	defer cancel()
+	return hec.WaitForAcknowledgementWithContext(ctx)
+}
+
 // breakStream breaks text from reader into chunks, with every chunk less than max.
 // Unless a single line is longer than max, it always cut at end of lines ("\n")
 func breakStream(reader io.ReadSeeker, max int, callback func(chunk []byte) error) error {
@@ -279,11 +359,11 @@ func (hec *Client) write(ctx context.Context, endpoint string, data []byte) erro
 	}
 
 	// Check for acknowledgement IDs and store them if provided
-	if response.AckID != "" {
+	if response.AckID != nil {
 		hec.ackMux.Lock()
 		defer hec.ackMux.Unlock()
 
-		hec.ackIDs = append(hec.ackIDs, response.AckID)
+		hec.ackIDs = append(hec.ackIDs, *response.AckID)
 	}
 
 	return nil
