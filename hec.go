@@ -1,6 +1,7 @@
 package hec
 
 import (
+	"context"
 	"io"
 	"net/http"
 )
@@ -20,4 +21,10 @@ type HEC interface {
 
 	// WriteRaw writes raw data stream via HEC raw mode
 	WriteRaw(reader io.ReadSeeker, metadata *EventMetadata) error
+
+	// WaitForAcknowledgement blocks until the Splunk indexer acknowledges data sent to it
+	WaitForAcknowledgement() error
+
+	// WaitForAcknowledgementWithContext blocks until the Splunk indexer acknowledges data sent to it with a context for cancellation
+	WaitForAcknowledgementWithContext(ctx context.Context) error
 }
