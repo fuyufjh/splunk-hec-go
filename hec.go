@@ -27,4 +27,10 @@ type HEC interface {
 
 	// WriteRawWithContext writes raw data stream via HEC raw mode with a context for cancellation
 	WriteRawWithContext(ctx context.Context, reader io.ReadSeeker, metadata *EventMetadata) error
+
+	// WaitForAcknowledgement blocks until the Splunk indexer acknowledges data sent to it
+	WaitForAcknowledgement() error
+
+	// WaitForAcknowledgementWithContext blocks until the Splunk indexer acknowledges data sent to it with a context for cancellation
+	WaitForAcknowledgementWithContext(ctx context.Context) error
 }
