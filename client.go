@@ -2,6 +2,7 @@ package hec
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -52,6 +53,9 @@ type Client struct {
 
 	// Mutex to allow threadsafe acknowledgement checking
 	ackMux sync.Mutex
+
+	// Compression type, "" and "gzip" are supported
+	compression string
 }
 
 func NewClient(serverURL string, token string) HEC {
@@ -86,6 +90,10 @@ func (hec *Client) SetMaxRetry(retries int) {
 
 func (hec *Client) SetMaxContentLength(size int) {
 	hec.maxLength = size
+}
+
+func (hec *Client) SetCompression(compression string) {
+	hec.compression = compression
 }
 
 func (hec *Client) WriteEventWithContext(ctx context.Context, event *Event) error {
@@ -314,7 +322,21 @@ func (res *Response) String() string {
 func (hec *Client) makeRequest(ctx context.Context, endpoint string, data []byte) (*Response, error) {
 	retries := 0
 RETRY:
-	req, err := http.NewRequest(http.MethodPost, hec.serverURL+endpoint, bytes.NewReader(data))
+	var reader io.Reader
+	if hec.compression == "gzip" {
+		var buffer bytes.Buffer
+		gzipWriter := gzip.NewWriter(&buffer)
+		_, err := gzipWriter.Write(data)
+		gzipWriter.Close()
+		if err != nil {
+			return nil, err
+		}
+		reader = &buffer
+	} else {
+		reader = bytes.NewReader(data)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, hec.serverURL+endpoint, reader)
 	if err != nil {
 		return nil, err
 	}
@@ -323,6 +345,9 @@ RETRY:
 		req.Header.Set("Connection", "keep-alive")
 	}
 	req.Header.Set("Authorization", "Splunk "+hec.token)
+	if hec.compression == "gzip" {
+		req.Header.Set("Content-Encoding", "gzip")
+	}
 	res, err := hec.httpClient.Do(req)
 	if err != nil {
 		return nil, err

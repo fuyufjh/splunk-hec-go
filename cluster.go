@@ -78,6 +78,14 @@ func (c *Cluster) SetMaxContentLength(size int) {
 	c.mtx.Unlock()
 }
 
+func (c *Cluster) SetCompression(compression string) {
+	c.mtx.Lock()
+	for _, client := range c.clients {
+		client.SetCompression(compression)
+	}
+	c.mtx.Unlock()
+}
+
 func (c *Cluster) WriteEvent(event *Event) error {
 	return c.retry(func(client *Client) error {
 		return client.WriteEvent(event)

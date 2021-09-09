@@ -12,6 +12,7 @@ type HEC interface {
 	SetChannel(channel string)
 	SetMaxRetry(retries int)
 	SetMaxContentLength(size int)
+	SetCompression(compression string)
 
 	// WriteEvent writes single event via HEC json mode
 	WriteEvent(event *Event) error
